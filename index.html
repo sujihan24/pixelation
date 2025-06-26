@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>기억의 픽셀화 - Memory Pixelation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            cursor: url('pixcursor.png'), auto;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        .header {
+            text-align: center;
+            padding: 80px 20px 60px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .background-animation-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    filter: blur(1.7px);
+    opacity: 0.3;
+}
+
+.pixel-text-canvas {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+}
+
+.header p {
+    font-size: 0.9rem;
+    opacity: 0;
+    max-width: 800px;
+    margin: 0 auto;
+    font-weight: normal;
+    letter-spacing: 0.05em;
+    margin-top: 0;
+    transition: all 1s ease-in-out;
+    position: relative;
+    z-index: 10;
+}
+
+.dark-mode-toggle {
+    position: absolute;
+    top: 30px;
+    right: 30px;
+    z-index: 20; /* z-index 추가 */
+}
+
+        .header h1 {
+            font-size: 3.2rem;
+            margin-bottom: 30px;
+            color: var(--text-primary);
+
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            font-family: 'Courier New', monospace;
+            position: relative;
+            opacity: 0;
+        }
+
+        .pixel-text-canvas {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+
+        .header p {
+            font-size: 0.9rem;
+            opacity: 0;
+            max-width: 800px;
+            margin: 0 auto;
+            font-weight: normal;
+            letter-spacing: 0.05em;
+            margin-top: 0;
+            transition: all 1s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 0.7;
+            }
+        }
+
+        .timeline {
+            position: fixed;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+        }
+
+        .timeline-item {
+    width: 24px;
+    height: 18px;
+    background: var(--folder-color);
+    margin-bottom: 30px;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    position: relative;
+    border-radius: 1px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    transform-origin: center;
+    will-change: transform;
+}
+
+/* 폴더 탭 부분 추가 */
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 3px;
+    width: 8px;
+    height: 4px;
+    background: var(--folder-color);
+    border-radius: 1px 1px 0 0;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+        .section-header {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px 20px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .section-header h2 {
+            font-size: 1.8rem;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+        }
+
+        .section-header p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            opacity: 0.8;
+        }
+
+        .timeline-item.active {
+            background: var(--folder-active);
+            transform: scale(1.3) translateX(-5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 2;
+        }
+
+        /* 액티브 상태일 때 폴더 탭도 같은 색으로 */
+.timeline-item.active::before {
+    background: var(--folder-active);
+}
+
+        .timeline-item::after {
+            content: attr(data-year);
+            position: absolute;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.75rem;
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            white-space: nowrap;
+            color: var(--text-secondary);
+            font-weight: bold;
+            background: var(--bg-secondary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .timeline-item:hover {
+            background: var(--folder-hover);
+            transform: scale(1.2) translateX(-3px) rotateY(5deg);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+        }
+
+        .timeline-item:hover::before {
+    background: var(--folder-hover);
+}
+
+        .timeline-item:hover::after {
+            opacity: 1;
+            transform: translateY(-50%) translateX(-5px);
+        }
+
+        .memory-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 40px;
+            padding: 60px 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .memory-item {
+    aspect-ratio: 1;
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transform-style: preserve-3d;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    cursor: pointer;
+    will-change: transform;
+    backface-visibility: hidden;
+}
+
+.memory-item:hover {
+    transform: translateY(-8px) rotateX(5deg) rotateY(2deg) scale(1.05);
+    box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.15),
+        0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.memory-item:hover .memory-canvas {
+    transform: translateZ(15px) scale(1.02);
+    filter: brightness(1.1) contrast(1.05);
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.memory-item:hover .memory-info {
+    transform: translateY(-5px) translateZ(20px);
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.memory-item:hover .quality-indicator {
+    transform: translateX(5px) translateY(-5px) translateZ(25px) scale(1.1);
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* 다크모드 그림자 조정 */
+[data-theme="dark"] .memory-item {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+[data-theme="dark"] .memory-item:hover {
+    transform: translateY(-8px) rotateX(5deg) rotateY(2deg) scale(1.05);
+    box-shadow: 
+        -15px 25px 60px rgba(0, 0, 0, 0.5),
+        0 15px 35px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+        .memory-canvas {
+            width: 100%;
+            height: 100%;
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .memory-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(255,255,255,0.95));
+            padding: 30px 20px 20px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            color: #333;
+        }
+
+        .memory-item:hover .memory-info {
+            transform: translateY(0);
+        }
+
+        .memory-info h3 {
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+            font-weight: bold;
+            letter-spacing: 0.03em;
+        }
+
+        .memory-info p {
+            font-size: 0.7rem;
+            opacity: 0.6;
+            font-weight: normal;
+            letter-spacing: 0.02em;
+        }
+
+        .quality-indicator {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: bold;
+            color: white;
+            font-family: 'Courier New', monospace;
+        }
+
+        .quality-high {
+            background: #333;
+        }
+
+        .quality-medium {
+            background: #666;
+        }
+
+        .quality-low {
+            background: #999;
+        }
+
+        .quality-degraded {
+            background: #ccc;
+            color: #666;
+        }
+
+
+        .dark-mode-toggle {
+    position: absolute;
+    top: 30px;
+    right: 30px;
+    /* 토글 버튼 디자인 CSS */
+}
+
+.dark-mode-toggle input {
+    display: none;
+}
+
+.dark-mode-toggle label {
+    display: block;
+    width: 50px;
+    height: 26px;
+    background: var(--border-color);
+    border-radius: 13px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.3s;
+}
+
+.dark-mode-toggle label:after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 22px;
+    height: 22px;
+    background: var(--bg-secondary);
+    border-radius: 50%;
+    transition: transform 0.3s;
+}
+
+.dark-mode-toggle input:checked + label {
+    background: var(--text-primary);
+}
+
+.dark-mode-toggle input:checked + label:after {
+    transform: translateX(24px);
+}
+        /* CSS 변수 정의 */
+        :root {
+    --bg-primary: #f8f8f8;
+    --bg-secondary: #ffffff;
+    --text-primary: #333;
+    --text-secondary: #666;
+    --border-color: #e0e0e0;
+    --shadow-color: rgba(0,0,0,0.06);
+    --shadow-hover: rgba(0,0,0,0.12);
+    --modal-bg: rgba(255,255,255,0.95);
+    --pixel-text-color: #222;
+    --folder-color: #ddd;
+    --folder-active: #333;
+    --folder-hover: #666;
+}
+
+[data-theme="dark"] {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2a2a2a;
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0a0;
+    --border-color: #333;
+    --shadow-color: rgba(0,0,0,0.3);
+    --shadow-hover: rgba(0,0,0,0.5);
+    --modal-bg: rgba(26,26,26,0.95);
+    --pixel-text-color: #e0e0e0;
+    --folder-color: #555;
+    --folder-active: #bbb;
+    --folder-hover: #888;
+}
+
+        /* 커스텀 픽셀 커서 - 16x16 픽셀 원형 */
+        .memory-item,
+        .timeline-item,
+        .control-btn,
+        .upload-btn,
+        .close-modal,
+        .dark-mode-toggle label {
+            cursor: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFoSURBVDiNpZM9SwNBEIafJQQSG1sLwcJCG1sLG38BtrYWNhYWFhYWNhYWFhYWFhZaWNjYWFhYWNjYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWNjYWFhYWFhYWFhYWNjYWFhYWFhYWFhYWFhYWNjYWFhYWFhYWFhYWNjYWFhYWFhYWFhYWNjYWFhYWFhYWNjYGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsAAAA='), pointer;
+        }
+
+        /* 호버 시 더 큰 픽셀 커서 */
+        .memory-item:hover,
+.timeline-item:hover,
+.control-btn:hover,
+.upload-btn:hover,
+.close-modal:hover,
+.dark-mode-toggle label:hover {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36"><defs><filter id="glow"><feGaussianBlur stdDeviation="2" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g filter="url(%23glow)"><rect x="10" y="6" width="4" height="4" fill="white"/><rect x="14" y="6" width="4" height="4" fill="white"/><rect x="18" y="6" width="4" height="4" fill="white"/><rect x="22" y="6" width="4" height="4" fill="white"/><rect x="6" y="10" width="4" height="4" fill="white"/><rect x="26" y="10" width="4" height="4" fill="white"/><rect x="4" y="14" width="4" height="4" fill="white"/><rect x="28" y="14" width="4" height="4" fill="white"/><rect x="4" y="18" width="4" height="4" fill="white"/><rect x="28" y="18" width="4" height="4" fill="white"/><rect x="6" y="22" width="4" height="4" fill="white"/><rect x="26" y="22" width="4" height="4" fill="white"/><rect x="10" y="26" width="4" height="4" fill="white"/><rect x="14" y="26" width="4" height="4" fill="white"/><rect x="18" y="26" width="4" height="4" fill="white"/><rect x="22" y="26" width="4" height="4" fill="white"/></g><rect x="12" y="8" width="4" height="4" fill="black"/><rect x="16" y="8" width="4" height="4" fill="black"/><rect x="20" y="8" width="4" height="4" fill="black"/><rect x="8" y="12" width="4" height="4" fill="black"/><rect x="24" y="12" width="4" height="4" fill="black"/><rect x="6" y="16" width="4" height="4" fill="black"/><rect x="26" y="16" width="4" height="4" fill="black"/><rect x="8" y="20" width="4" height="4" fill="black"/><rect x="24" y="20" width="4" height="4" fill="black"/><rect x="12" y="24" width="4" height="4" fill="black"/><rect x="16" y="24" width="4" height="4" fill="black"/><rect x="20" y="24" width="4" height="4" fill="black"/><rect x="14" y="14" width="4" height="4" fill="black"/><rect x="18" y="14" width="4" height="4" fill="black"/><rect x="14" y="18" width="4" height="4" fill="black"/><rect x="18" y="18" width="4" height="4" fill="black"/></svg>') 18 18, pointer;
+}
+
+.timeline-link-button {
+    position: fixed;
+    right: 30px;
+    bottom: 30%;
+    transform: translateY(-50%);
+    z-index: 100;
+    width: 25px;
+    height: 25px;
+    background: var(--text-primary);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 2px 8px var(--shadow-color);
+    cursor: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFoSURBVDiNpZM9SwNBEIafJQQSG1sLwcJCG1sLG38BtrYWNhYWFhYWNhYWFhYWFhZaWNjYWFhYWNjYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWNjYWFhYWFhYWFhYWNjYWFhYWFhYWFhYWFhYWNjYWFhYWFhYWFhYWNjYWFhYWFhYWFhYWNjYWFhYWFhYWNjYGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsAAAA='), pointer;
+}
+
+/* 삼각형 아이콘 생성 */
+.timeline-link-button::before {
+    content: '';
+    width: 0;
+    height: 0;
+    border-left: 12px solid var(--bg-primary);
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    margin-left: 2px; /* 중앙 정렬을 위한 약간의 오프셋 */
+}
+
+/* 호버 효과 */
+.timeline-link-button:hover {
+    transform: translateY(-50%) translateX(-3px) scale(1.1);
+    box-shadow: 0 4px 16px var(--shadow-hover);
+    background: var(--text-secondary);
+}
+
+.timeline-link-button:hover::before {
+    border-left-color: var(--bg-primary);
+    animation: pulse-play 0.6s ease-in-out;
+}
+
+/* 플레이 버튼 펄스 애니메이션 */
+@keyframes pulse-play {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* 다크모드에서의 스타일 조정 */
+[data-theme="dark"] .timeline-link-button {
+    background: var(--text-primary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+[data-theme="dark"] .timeline-link-button:hover {
+    background: var(--text-secondary);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+}
+
+/* 모바일에서 위치 조정 */
+@media (max-width: 768px) {
+    .timeline-link-button {
+        right: 20px;
+        bottom: 20px;
+        transform: none;
+    }
+}
+
+.stats-panel {
+    display: none;
+}
+
+
+
+.modal {
+    display: none;
+}
+    </style>
+</head>
+<body>
+    <header class="header">
+        <canvas class="background-animation-canvas" id="backgroundAnimationCanvas"></canvas>
+        <canvas class="pixel-text-canvas" id="pixelTextCanvas"></canvas>
+        <p>
+            Pixels fail to withstand time, gradually becoming distorted.<br>
+            Digital memories remain only in part, while others fade into blur.<br>
+            Forgotten scenes overlap gently atop the traces of decay.
+        </p>
+        <div class="dark-mode-toggle">
+            <input type="checkbox" id="darkModeSwitch">
+            <label for="darkModeSwitch"></label>
+        </div>
+    </header>
+    
+
+    <div class="timeline">
+        <div class="timeline-item active" data-year="ALL" data-age="all"></div>
+        <div class="timeline-item" data-year="2024" data-age="0"></div>
+        <div class="timeline-item" data-year="2023" data-age="1"></div>
+        <div class="timeline-item" data-year="2022" data-age="2"></div>
+        <div class="timeline-item" data-year="2021" data-age="3"></div>
+        <div class="timeline-item" data-year="2020" data-age="4"></div>
+    </div>
+
+    <a href="video.html" target="_blank" class="timeline-link-button" title="Visit YouTube Channel"></a>
+    
+    <div class="memory-grid" id="memoryGrid">
+        <!-- 메모리 아이템들이 동적으로 생성됩니다 -->
+    </div>
+
+    <div class="stats-panel">
+        <h3>.</h3>
+        <div class="stat-item">
+            <span>.</span>
+            <span id="totalMemories">0</span>
+        </div>
+        <div class="stat-item">
+            <span>.</span>
+            <span id="clearMemories">0</span>
+        </div>
+        <div class="stat-item">
+            <span>.</span>
+            <span id="blurryMemories">0</span>
+        </div>
+        <div class="stat-item">
+            <span>.</span>
+            <span id="lostMemories">.</span>
+        </div>
+    </div>
+
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal()">&times;</button>
+            <canvas class="modal-canvas" id="modalCanvas"></canvas>
+            < class="modal-controls">
+                <button class="control-btn active" onclick="showDegradation(0)">.</button>
+                <button class="control-btn" onclick="showDegradation(1)">.</button>
+                <button class="control-btn" onclick="showDegradation(2)">.</button>
+                <button class="control-btn" onclick="showDegradation(3)">.</button>
+                <button class="control-btn" onclick="showDegradation(4)">.</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class PixelTextAnimation {
+            constructor(canvas, text) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.text = text;
+                this.pixels = [];
+                this.animationFrame = 0;
+                this.isComplete = false;
+                
+                this.setupCanvas();
+                this.generatePixels();
+                this.animate();
+            }
+
+            setupCanvas() {
+                const fontSize = 65;
+                this.ctx.font = `bold ${fontSize}px 'Courier New', monospace`;
+                const textWidth = this.ctx.measureText(this.text).width;
+                const textHeight = fontSize;
+                
+                this.canvas.width = textWidth + 40;
+                this.canvas.height = textHeight + 40;
+                this.canvas.style.width = (textWidth + 40) + 'px';
+                this.canvas.style.height = (textHeight + 40) + 'px';
+            }
+
+            generatePixels() {
+                const fontSize = 65;
+                this.ctx.font = `bold ${fontSize}px 'Courier New', monospace`;
+                const computedStyle = getComputedStyle(document.documentElement);
+                this.ctx.fillStyle = computedStyle.getPropertyValue('--pixel-text-color').trim();
+    
+                this.ctx.fillText(this.text, 20, fontSize + 10);
+                
+                const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+                const data = imageData.data;
+                
+                this.pixels = [];
+                const pixelSize = 3;
+                
+                for (let y = 0; y < this.canvas.height; y += pixelSize) {
+                    for (let x = 0; x < this.canvas.width; x += pixelSize) {
+                        const index = (y * this.canvas.width + x) * 4;
+                        const alpha = data[index + 3];
+                        
+                        if (alpha > 128) {
+                            this.pixels.push({
+                                x: x,
+                                y: y,
+                                targetX: x,
+                                targetY: y,
+                                currentX: x + (Math.random() - 0.5) * 200,
+                                currentY: y + (Math.random() - 0.5) * 200,
+                                size: pixelSize,
+                                delay: Math.random() * 100,
+                                speed: 0.1 + Math.random() * 0.05
+                            });
+                        }
+                    }
+                }
+                
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+
+            animate() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                const computedStyle = getComputedStyle(document.documentElement);
+                this.ctx.fillStyle = computedStyle.getPropertyValue('--pixel-text-color').trim();
+                
+                let allComplete = true;
+                
+                this.pixels.forEach(pixel => {
+                    if (this.animationFrame > pixel.delay) {
+                        const dx = pixel.targetX - pixel.currentX;
+                        const dy = pixel.targetY - pixel.currentY;
+                        
+                        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+                            pixel.currentX += dx * pixel.speed;
+                            pixel.currentY += dy * pixel.speed;
+                            allComplete = false;
+                        } else {
+                            pixel.currentX = pixel.targetX;
+                            pixel.currentY = pixel.targetY;
+                        }
+                    } else {
+                        allComplete = false;
+                    }
+                    
+                    this.ctx.fillRect(
+                        Math.round(pixel.currentX), 
+                        Math.round(pixel.currentY), 
+                        pixel.size, 
+                        pixel.size
+                    );
+                });
+                
+                this.animationFrame++;
+                
+                if (!allComplete) {
+                    requestAnimationFrame(() => this.animate());
+                } else {
+                    this.isComplete = true;
+                    // 애니메이션 완료 후 캔버스는 그대로 유지하고 캡션만 표시
+                    setTimeout(() => {
+                        const caption = document.querySelector('.header p');
+                        caption.style.opacity = '0.7';
+                        caption.style.marginTop = '120px';
+                    }, 500);
+                }
+            }
+        }
+
+        class BackgroundPixelAnimation {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.particles = [];
+        this.animationId = null;
+        
+        this.setupCanvas();
+        this.generateParticles();
+        this.animate();
+        
+        // 리사이즈 이벤트 리스너
+        window.addEventListener('resize', () => {
+            this.setupCanvas();
+            this.generateParticles();
+        });
+    }
+    
+    setupCanvas() {
+        this.canvas.width = this.canvas.offsetWidth;
+        this.canvas.height = this.canvas.offsetHeight;
+    }
+    
+    generateParticles() {
+        this.particles = [];
+        // 파티클 개수 대폭 증가 (기존 8000 -> 3000)
+        const particleCount = Math.floor((this.canvas.width * this.canvas.height) / 3000);
+        
+        for (let i = 0; i < particleCount; i++) {
+            this.particles.push({
+                x: Math.random() * this.canvas.width,
+                y: Math.random() * this.canvas.height,
+                // 크기 범위 증가 (1-5 -> 2-8)
+                size: Math.random() * 6 + 2,
+                // 적당한 속도로 조정
+                speedX: (Math.random() - 0.5) * 0.8,
+                speedY: (Math.random() - 0.5) * 0.8,
+                // 기본 투명도 증가
+                opacity: Math.random() * 0.7 + 0.2,
+                life: Math.random() * 300 + 150,
+                maxLife: Math.random() * 300 + 150,
+                // 느린 회전 효과
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: (Math.random() - 0.5) * 0.005,
+                // 부드러운 펄스 효과
+                pulsePhase: Math.random() * Math.PI * 2,
+                pulseSpeed: 0.008 + Math.random() * 0.012
+            });
+        }
+    }
+    
+    animate() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // 현재 테마에 따른 색상 설정
+        const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+        const particleColor = isDarkMode ? '200, 200, 200' : '50, 50, 50';
+        
+        this.particles.forEach(particle => {
+            // 파티클 이동
+            particle.x += particle.speedX;
+            particle.y += particle.speedY;
+            particle.life--;
+            
+            // 회전 업데이트
+            particle.rotation += particle.rotationSpeed;
+            
+            // 펄스 효과 업데이트 (더 부드럽게)
+            particle.pulsePhase += particle.pulseSpeed;
+            const pulseScale = 1 + Math.sin(particle.pulsePhase) * 0.15;
+            
+            // 생명주기에 따른 투명도 조정 (더 강한 효과)
+            const lifeRatio = particle.life / particle.maxLife;
+            particle.opacity = Math.max(0, lifeRatio * 0.8);
+            
+            // 경계 처리 - 반사 대신 랩어라운드로 더 역동적으로
+            if (particle.x < -particle.size) {
+                particle.x = this.canvas.width + particle.size;
+            } else if (particle.x > this.canvas.width + particle.size) {
+                particle.x = -particle.size;
+            }
+            
+            if (particle.y < -particle.size) {
+                particle.y = this.canvas.height + particle.size;
+            } else if (particle.y > this.canvas.height + particle.size) {
+                particle.y = -particle.size;
+            }
+            
+            // 파티클 재생성
+            if (particle.life <= 0) {
+                particle.x = Math.random() * this.canvas.width;
+                particle.y = Math.random() * this.canvas.height;
+                particle.life = particle.maxLife;
+                particle.speedX = (Math.random() - 0.5) * 0.8;
+                particle.speedY = (Math.random() - 0.5) * 0.8;
+                particle.rotation = Math.random() * Math.PI * 2;
+                particle.pulsePhase = Math.random() * Math.PI * 2;
+            }
+            
+            // 파티클 그리기 - 회전과 펄스 효과 적용
+            this.ctx.save();
+            this.ctx.translate(particle.x + particle.size/2, particle.y + particle.size/2);
+            this.ctx.rotate(particle.rotation);
+            this.ctx.scale(pulseScale, pulseScale);
+            
+            this.ctx.fillStyle = `rgba(${particleColor}, ${particle.opacity})`;
+            this.ctx.fillRect(
+                -particle.size/2, 
+                -particle.size/2, 
+                particle.size, 
+                particle.size
+            );
+            
+            this.ctx.restore();
+        });
+        
+        this.animationId = requestAnimationFrame(() => this.animate());
+    }
+    
+    destroy() {
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+        }
+    }
+}
+
+        class MemoryPixelation {
+
+            initBackgroundAnimation() {
+    const canvas = document.getElementById('backgroundAnimationCanvas');
+    this.backgroundAnimation = new BackgroundPixelAnimation(canvas);
+}
+
+            toggleDarkMode(isDark) {
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    localStorage.setItem('darkMode', isDark);
+
+    
+    
+    // 개별 메모리 요소만 업데이트 (이벤트 보존)
+    this.memories.forEach(memory => {
+        if (memory.isLoaded) {
+            this.updateMemoryElement(memory);
+        }
+    });
+
+    
+    
+    // 픽셀 텍스트 다시 그리기
+    this.initPixelText();
+    
+    // 현재 열린 모달이 있다면 다시 그리기
+    if (this.selectedMemory && document.getElementById('modal').classList.contains('active')) {
+        const modalCanvas = document.getElementById('modalCanvas');
+        this.drawModalImage(modalCanvas, this.selectedMemory, 0);
+    }
+
+}
+
+            constructor() {
+                this.memories = [];
+                this.currentFilter = 'all';
+                this.selectedMemory = null;
+                this.uploadedImage = null;
+                this.originalImageData = null;
+                this.init();
+                // 메모리별 설명 매핑 (customImageMappings 아래에 추가)
+this.memoryDescriptions = {
+    '2020_커디2.jpg': {
+        title: '추억의 변화',
+        descriptions: [
+            '소중한 순간들이 시간과 함께 변해갑니다.',
+            '기억 속 디테일들이 서서히 흐려지며 새로운 형태로 재탄생합니다.',
+            '과거의 선명함이 현재의 감성으로 재해석됩니다.'
+        ]
+    },
+    '2022_커디_1.png': {
+        title: '디지털 기억의 진화',
+        descriptions: [
+            '픽셀로 이루어진 추억이 시간의 흐름과 함께 변화합니다.',
+            '선명했던 순간들이 추상적인 아름다움으로 승화됩니다.',
+            '기억의 본질은 형태가 바뀌어도 여전히 남아있습니다.'
+        ]
+    },
+    'lur_won.png': {
+        title: '시간이 남긴 흔적',
+        descriptions: [
+            '자연스러운 열화 과정을 통해 새로운 미학이 탄생합니다.',
+            '원본의 정보가 압축되며 핵심만 남게 됩니다.',
+            '불완전함 속에서 발견되는 완전한 아름다움.'
+        ]
+    },
+    // 다른 이미지들도 동일하게 추가...
+    'default': {
+        title: 'DEGRADATION PROCESS',
+        descriptions: [
+            'Digital memories degrade over time through pixelation, color reduction, and noise accumulation.',
+            'Use the slider above to see how this memory has changed over the years.',
+            'The degradation process simulates the natural loss of detail that occurs as memories fade from our consciousness.'
+        ]
+    }
+};
+            }
+
+            init() {
+    this.generateMemories();
+    this.renderMemories();
+    this.setupEventListeners();
+    this.updateStats();
+    this.initPixelText();
+    this.initBackgroundAnimation(); // 추가
+
+    // 저장된 다크모드 설정 불러오기
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    document.getElementById('darkModeSwitch').checked = savedDarkMode;
+    this.toggleDarkMode(savedDarkMode);
+}
+
+            initPixelText() {
+                const canvas = document.getElementById('pixelTextCanvas');
+                new PixelTextAnimation(canvas, 'MEMORY PIXELATION');
+            }
+
+            generateMemories() {
+                const memoryTypes = [
+        { 
+            name: "MY FAVORITE GROUP", 
+            category: "hobby", 
+            age: 4,
+            imagePath: "2020_커디2.jpg",
+        darkImagePath: "2020_커디2_dark.jpg"  // 다크모드용 이미지 경로 추가
+    },
+        { 
+            name: "MY HIGHSCHOOL DESIGN", 
+            category: "work", 
+            age: 2,
+            imagePath: "2022_커디_1.png",
+            darkImagePath: "2022_1_dark.png"
+        },
+        { 
+            name: "MY SISO WORK", 
+            category: "work", 
+            age: 0,
+            imagePath: "lur_won.png",
+            darkImagePath: "lur_dark.png"
+        },
+        { 
+            name: "MY UNCANNY WORK", 
+            category: "work", 
+            age: 0,
+            imagePath: "Face_won.png",
+            darkImagePath: "Face_dark.png"
+            
+        },
+        { 
+            name: "MY RUMMIKUB", 
+            category: "game", 
+            age: 3,
+            imagePath: "Rm_won.png",
+            darkImagePath: "Rm_dark.png"
+        },
+        { 
+            name: "MY FAVORITE WAFFLE", 
+            category: "food", 
+            age: 4,
+            imagePath: "Wf_won.png",
+            darkImagePath: "Wf_dark.png"
+            
+        },
+        { 
+            name: "MY STUDY", 
+            category: "book", 
+            age:1,
+            imagePath: "St_won.png",
+            darkImagePath: "St_dark.png"
+        },
+        { 
+            name: "MY BASIC SCULPT", 
+            category: "work", 
+            age: 0,
+            imagePath: "Gd_won.png",
+            darkImagePath: "Gd_5.png"
+        },
+        { 
+            name: "ILLUST", 
+            category: "work", 
+            age: 2,
+            imagePath: "Il_won.png",
+            darkImagePath: "Il_dark.png"
+        },
+        { 
+            name: "MY BUS SCHEDULE", 
+            category: "daily", 
+            age: 2,
+            imagePath: "bus_won.png",
+            darkImagePath: "bus_5.png"
+
+        },
+        { 
+            name: "SCHOOL", 
+            category: "work", 
+            age: 1,
+            imagePath: "sc_won.png",
+            darkImagePath: "sc_5.png"
+            
+        },
+        { 
+            name: "CRUELLA", 
+            category: "movie", 
+            age: 3,
+            imagePath: "cr_won.png",
+            darkImagePath: "cr_dark.png"
+        },
+        
+        // ... 나머지 메모리들도 동일하게 imagePath 추가
+    ];
+
+    this.memories = memoryTypes.map((type, index) => ({
+        id: index,
+        ...type,
+        uploadedImage: null,
+        originalImageData: null,
+        isPlaceholder: false,  // false로 변경
+        isLoaded: false        // 로딩 상태 추가
+    }));
+    this.preloadImages();
+}
+
+            generatePatternData(category) {
+                // 카테고리별로 모노톤 그레이 팔레트 사용
+                const palettes = {
+                    personal: ['#333333', '#666666', '#999999'],
+                    daily: ['#222222', '#555555', '#888888'],
+                    social: ['#444444', '#777777', '#aaaaaa'],
+                    event: ['#111111', '#444444', '#777777'],
+                    communication: ['#2a2a2a', '#5a5a5a', '#8a8a8a'],
+                    travel: ['#1a1a1a', '#4a4a4a', '#7a7a7a'],
+                    entertainment: ['#303030', '#606060', '#909090'],
+                    education: ['#252525', '#555555', '#858585'],
+                    family: ['#1e1e1e', '#4e4e4e', '#7e7e7e'],
+                    utility: ['#2c2c2c', '#5c5c5c', '#8c8c8c']
+                };
+
+                return {
+                    colors: palettes[category] || palettes.daily,
+                    shapes: this.generateShapes(category),
+                    composition: this.generateComposition()
+                };
+            }
+
+            generateShapes(category) {
+                // 카테고리별 기하학적 형태 정의
+                const shapeTypes = {
+                    personal: 'circles',
+                    daily: 'rectangles', 
+                    social: 'triangles',
+                    event: 'mixed',
+                    communication: 'lines',
+                    travel: 'curves',
+                    entertainment: 'polygons',
+                    education: 'grids',
+                    family: 'organic',
+                    utility: 'minimal'
+                };
+
+                return shapeTypes[category] || 'mixed';
+            }
+
+            generateComposition() {
+                return {
+                    density: Math.random() * 0.5 + 0.3,
+                    symmetry: Math.random() > 0.5,
+                    flow: Math.random() * 360
+                };
+            }
+
+            degradeToPattern(originalData, age, category) {
+                const degradationLevel = age / 4; // 0~1 사이의 값
+                
+                return {
+                    pixelSize: Math.floor(4 + (age * 8)), // 픽셀 크기 증가
+                    colorReduction: Math.max(1, 3 - age), // 색상 수 감소
+                    shapeSimplification: degradationLevel,
+                    noiseLevel: age * 0.1,
+                    pattern: this.simplifyPattern(originalData, degradationLevel, category)
+                };
+            }
+
+            simplifyPattern(originalData, level, category) {
+                // 열화 수준에 따른 패턴 단순화
+                if (level < 0.3) {
+                    return 'detailed'; // 상세한 패턴
+                } else if (level < 0.6) {
+                    return 'medium'; // 중간 단순화
+                } else if (level < 0.8) {
+                    return 'simple'; // 기본 기하학 도형
+                } else {
+                    return 'minimal'; // 최소한의 점, 선, 면
+                }
+            }
+
+            preloadImages() {
+    this.memories.forEach(memory => {
+        // 라이트모드 이미지 로드
+        const img = new Image();
+        img.onload = () => {
+            memory.uploadedImage = img;
+            
+            // 원본 이미지 데이터 저장
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = img.width;
+            tempCanvas.height = img.height;
+            tempCtx.drawImage(img, 0, 0);
+            memory.originalImageData = tempCtx.getImageData(0, 0, img.width, img.height);
+            
+            // 다크모드 이미지도 있는 경우 로드
+            if (memory.darkImagePath) {
+                const darkImg = new Image();
+                darkImg.onload = () => {
+                    memory.darkUploadedImage = darkImg;
+                    
+                    // 다크모드 이미지 데이터 저장
+                    const darkTempCanvas = document.createElement('canvas');
+                    const darkTempCtx = darkTempCanvas.getContext('2d');
+                    darkTempCanvas.width = darkImg.width;
+                    darkTempCanvas.height = darkImg.height;
+                    darkTempCtx.drawImage(darkImg, 0, 0);
+                    memory.darkOriginalImageData = darkTempCtx.getImageData(0, 0, darkImg.width, darkImg.height);
+                    
+                    memory.isLoaded = true;
+                    this.updateMemoryElement(memory);
+                };
+                darkImg.src = memory.darkImagePath;
+            } else {
+                memory.isLoaded = true;
+                this.updateMemoryElement(memory);
+            }
+        };
+        img.src = memory.imagePath;
+    });
+}
+
+updateMemoryElement(memory) {
+    const element = document.querySelector(`[data-memory-id="${memory.id}"]`);
+    if (element) {
+        const canvas = element.querySelector('.memory-canvas');
+        this.drawMemoryImage(canvas, memory, memory.age);
+        
+        // 기존 이벤트 리스너 제거 (만약 있다면)
+        element.removeEventListener('mouseenter', element._hoverEnter);
+        element.removeEventListener('mouseleave', element._hoverLeave);
+        
+        // 새로운 호버 이벤트 추가 (참조 저장)
+        element._hoverEnter = (e) => {
+    this.drawMemoryImage(canvas, memory, 0);
+    
+    // 마우스 위치에 따른 동적 회전 (선택사항)
+    const rect = element.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const rotateX = (e.clientY - centerY) / 10;
+    const rotateY = (centerX - e.clientX) / 10;
+    
+    element.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(20px)`;
+};
+
+element._hoverLeave = () => {
+    this.drawMemoryImage(canvas, memory, memory.age);
+    element.style.transform = ''; // 원래 상태로 복원
+};
+        
+        element.addEventListener('mouseenter', element._hoverEnter);
+        element.addEventListener('mouseleave', element._hoverLeave);
+    }
+}
+
+            pixelateImage(canvas, imageData, pixelSize) {
+                const ctx = canvas.getContext('2d');
+                const data = imageData.data;
+                const width = imageData.width;
+                const height = imageData.height;
+
+                // 새로운 이미지 데이터 생성
+                const newImageData = ctx.createImageData(width, height);
+                const newData = newImageData.data;
+
+                for (let y = 0; y < height; y += pixelSize) {
+                    for (let x = 0; x < width; x += pixelSize) {
+                        // 픽셀 블록의 평균 색상 계산
+                        let r = 0, g = 0, b = 0, a = 0;
+                        let count = 0;
+
+                        for (let py = y; py < Math.min(y + pixelSize, height); py++) {
+                            for (let px = x; px < Math.min(x + pixelSize, width); px++) {
+                                const index = (py * width + px) * 4;
+                                r += data[index];
+                                g += data[index + 1];
+                                b += data[index + 2];
+                                a += data[index + 3];
+                                count++;
+                            }
+                        }
+
+                        r = Math.floor(r / count);
+                        g = Math.floor(g / count);
+                        b = Math.floor(b / count);
+                        a = Math.floor(a / count);
+
+                        // 픽셀 블록을 평균 색상으로 채우기
+                        for (let py = y; py < Math.min(y + pixelSize, height); py++) {
+                            for (let px = x; px < Math.min(x + pixelSize, width); px++) {
+                                const index = (py * width + px) * 4;
+                                newData[index] = r;
+                                newData[index + 1] = g;
+                                newData[index + 2] = b;
+                                newData[index + 3] = a;
+                            }
+                        }
+                    }
+                }
+
+                return newImageData;
+            }
+
+            renderMemories() {
+                const grid = document.getElementById('memoryGrid');
+                grid.innerHTML = '';
+
+                // 현재 필터에 맞는 메모리만 표시
+                const filteredMemories = this.currentFilter === 'all' ? 
+                    this.memories : 
+                    this.memories.filter(memory => memory.age === this.currentFilter);
+
+                filteredMemories.forEach(memory => {
+                    const memoryElement = this.createMemoryElement(memory);
+                    grid.appendChild(memoryElement);
+                });
+
+                // 섹션 헤더 추가
+                if (this.currentFilter !== 'all') {
+                    const sectionHeader = document.createElement('div');
+                    sectionHeader.className = 'section-header';
+                    sectionHeader.innerHTML = `
+                        <h2>${this.getFilterTitle(this.currentFilter)}</h2>
+                        <p>${filteredMemories.length} memories from ${this.getQualityText(this.currentFilter).toLowerCase()}</p>
+                    `;
+                    grid.insertBefore(sectionHeader, grid.firstChild);
+                }
+            }
+
+            createMemoryElement(memory) {
+                const element = document.createElement('div');
+                element.className = 'memory-item';
+                element.dataset.memoryId = memory.id;
+
+                const canvas = document.createElement('canvas');
+                canvas.className = 'memory-canvas';
+                canvas.width = 300;
+                canvas.height = 300;
+
+                const info = document.createElement('div');
+                info.className = 'memory-info';
+                info.innerHTML = `
+                    <h3>${memory.name}</h3>
+                    <p>${this.getQualityText(memory.age)} AGO • ${memory.category.toUpperCase()}</p>
+                `;
+
+                const indicator = document.createElement('div');
+                indicator.className = `quality-indicator ${this.getQualityClass(memory.age)}`;
+                indicator.textContent = Math.max(10, 100 - (memory.age * 20)) + '%';
+
+                // 플레이스홀더 그리기
+                if (memory.isLoaded) {
+        this.drawMemoryImage(canvas, memory, memory.age);
+    } else {
+        this.drawLoadingPlaceholder(canvas, memory.category);
+    }
+
+                element.appendChild(canvas);
+                element.appendChild(info);
+                element.appendChild(indicator);
+
+                // 클릭 이벤트 (업로드된 이미지가 있을 때만)
+                // 클릭 이벤트 (항상 추가하되, 로딩 상태 체크)
+element.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // 로딩 완료 여부 확인
+    if (memory.isLoaded) {
+        const params = new URLSearchParams({
+            memoryId: memory.id,
+            name: memory.name,
+            category: memory.category,
+            age: memory.age,
+            imagePath: memory.imagePath
+        });
+        window.location.href = `memory-detail.html?${params.toString()}`;
+    } else {
+        // 로딩 중일 때는 시각적 피드백만 제공
+        console.log('Memory still loading...');
+    }
+});
+
+                return element;
+            }
+
+            uploadMemoryImage(event, memory, canvas) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        memory.uploadedImage = img;
+                        memory.isPlaceholder = false;
+                        
+                        // 원본 이미지 데이터 저장
+                        const tempCanvas = document.createElement('canvas');
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCanvas.width = img.width;
+                        tempCanvas.height = img.height;
+                        tempCtx.drawImage(img, 0, 0);
+                        memory.originalImageData = tempCtx.getImageData(0, 0, img.width, img.height);
+                        
+                        // 캔버스에 픽셀화된 이미지 그리기 (해당 연도에 맞게)
+                        this.drawMemoryImage(canvas, memory, memory.age);
+                        
+                        // 호버 이벤트 추가
+                        canvas.parentElement.addEventListener('mouseenter', () => {
+                            this.drawMemoryImage(canvas, memory, 0); // 원본 복원
+                        });
+
+                        canvas.parentElement.addEventListener('mouseleave', () => {
+                            this.drawMemoryImage(canvas, memory, memory.age); // 다시 열화
+                        });
+
+                        // 업로드 input 제거
+                        const uploadInput = canvas.parentElement.querySelector('input[type="file"]');
+                        if (uploadInput) {
+                            uploadInput.style.display = 'none';
+                        }
+
+                        // 메모리 이름 업데이트
+                        const nameElement = canvas.parentElement.querySelector('.memory-info h3');
+                        nameElement.textContent = `UPLOADED ${memory.category.toUpperCase()}`;
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+
+            drawLoadingPlaceholder(canvas, category) {
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#f5f5f5';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // 카테고리별 다른 색상의 플레이스홀더
+                const colors = {
+                    personal: '#e8e8e8',
+                    daily: '#ececec',
+                    social: '#f0f0f0',
+                    event: '#e5e5e5',
+                    communication: '#ededed',
+                    travel: '#e9e9e9',
+                    entertainment: '#f1f1f1',
+                    education: '#eeeeee',
+                    family: '#e7e7e7',
+                    utility: '#efefefd'
+                };
+
+                ctx.fillStyle = colors[category] || '#f0f0f0';
+                ctx.fillRect(20, 20, canvas.width - 40, canvas.height - 40);
+
+                // 업로드 아이콘 그리기
+                ctx.fillStyle = '#ccc';
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('⏳', canvas.width / 2, canvas.height / 2 - 10);
+    ctx.font = '12px Arial';
+    ctx.fillText('LOADING...', canvas.width / 2, canvas.height / 2 + 20);
+}
+            
+
+drawMemoryImage(canvas, memory, degradationLevel) {
+    // 현재 테마에 따라 사용할 이미지 결정
+    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+    const currentImage = (isDarkMode && memory.darkUploadedImage) ? memory.darkUploadedImage : memory.uploadedImage;
+    const currentImageData = (isDarkMode && memory.darkOriginalImageData) ? memory.darkOriginalImageData : memory.originalImageData;
+    
+    if (!currentImage || !currentImageData) return;
+
+    const ctx = canvas.getContext('2d');
+    const pixelSizes = [1, 4, 8, 16, 32];
+    const pixelSize = pixelSizes[degradationLevel] || 1;
+
+    // 캔버스에 맞게 이미지 크기 조정
+    const aspectRatio = currentImageData.width / currentImageData.height;
+    let drawWidth, drawHeight;
+
+    if (aspectRatio > 1) {
+        drawWidth = canvas.width;
+        drawHeight = canvas.width / aspectRatio;
+    } else {
+        drawHeight = canvas.height;
+        drawWidth = canvas.height * aspectRatio;
+    }
+
+    const x = (canvas.width - drawWidth) / 2;
+    const y = (canvas.height - drawHeight) / 2;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 임시 캔버스에 이미지 그리기
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = drawWidth;
+    tempCanvas.height = drawHeight;
+
+    tempCtx.drawImage(currentImage, 0, 0, drawWidth, drawHeight);
+    const imageData = tempCtx.getImageData(0, 0, drawWidth, drawHeight);
+
+    // 픽셀화 적용
+    const pixelatedData = this.pixelateImage(tempCanvas, imageData, pixelSize);
+    
+    // 메인 캔버스에 픽셀화된 이미지 그리기
+    ctx.putImageData(pixelatedData, x, y);
+
+    // 추가 노이즈 효과
+    if (degradationLevel > 0) {
+        this.addNoise(ctx, canvas.width, canvas.height, degradationLevel * 0.05);
+    }
+}
+
+            drawDegradedPattern(canvas, memory, degradationAge) {
+                const ctx = canvas.getContext('2d');
+                const degradedData = memory.degradedData[degradationAge];
+                
+                // 캔버스 초기화
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // 패턴 렌더링
+                this.renderPattern(ctx, memory.originalData, degradedData, canvas.width, canvas.height);
+            }
+
+            renderPattern(ctx, originalData, degradedData, width, height) {
+                const colors = originalData.colors.slice(0, degradedData.colorReduction);
+                const pixelSize = degradedData.pixelSize;
+                const pattern = degradedData.pattern;
+
+                // 기본 격자 그리기
+                const cols = Math.floor(width / pixelSize);
+                const rows = Math.floor(height / pixelSize);
+
+                for (let x = 0; x < cols; x++) {
+                    for (let y = 0; y < rows; y++) {
+                        const color = colors[Math.floor(Math.random() * colors.length)];
+                        
+                        ctx.fillStyle = color;
+                        
+                        // 패턴에 따른 형태 그리기
+                        switch (pattern) {
+                            case 'detailed':
+                                this.drawDetailedShape(ctx, x * pixelSize, y * pixelSize, pixelSize, originalData.shapes);
+                                break;
+                            case 'medium':
+                                this.drawMediumShape(ctx, x * pixelSize, y * pixelSize, pixelSize, originalData.shapes);
+                                break;
+                            case 'simple':
+                                this.drawSimpleShape(ctx, x * pixelSize, y * pixelSize, pixelSize);
+                                break;
+                            case 'minimal':
+                                this.drawMinimalShape(ctx, x * pixelSize, y * pixelSize, pixelSize);
+                                break;
+                        }
+                    }
+                }
+
+                // 노이즈 효과 추가
+                if (degradedData.noiseLevel > 0) {
+                    this.addNoise(ctx, width, height, degradedData.noiseLevel);
+                }
+            }
+
+            drawDetailedShape(ctx, x, y, size, shapeType) {
+                switch (shapeType) {
+                    case 'circles':
+                        ctx.beginPath();
+                        ctx.arc(x + size/2, y + size/2, size/3, 0, Math.PI * 2);
+                        ctx.fill();
+                        break;
+                    case 'rectangles':
+                        ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
+                        break;
+                    case 'triangles':
+                        ctx.beginPath();
+                        ctx.moveTo(x + size/2, y + 2);
+                        ctx.lineTo(x + size - 2, y + size - 2);
+                        ctx.lineTo(x + 2, y + size - 2);
+                        ctx.closePath();
+                        ctx.fill();
+                        break;
+                    default:
+                        ctx.fillRect(x, y, size, size);
+                }
+            }
+
+            drawMediumShape(ctx, x, y, size, shapeType) {
+                // 중간 단순화된 형태
+                if (Math.random() > 0.3) {
+                    ctx.fillRect(x, y, size, size);
+                }
+            }
+
+            drawSimpleShape(ctx, x, y, size) {
+                // 기본 사각형만
+                if (Math.random() > 0.5) {
+                    ctx.fillRect(x, y, size, size);
+                }
+            }
+
+            drawMinimalShape(ctx, x, y, size) {
+                // 매우 단순한 형태
+                if (Math.random() > 0.7) {
+                    ctx.fillRect(x, y, size, size);
+                }
+            }
+
+            addNoise(ctx, width, height, level) {
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const data = imageData.data;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    if (Math.random() < level) {
+                        const noise = (Math.random() - 0.5) * 50;
+                        data[i] = Math.max(0, Math.min(255, data[i] + noise));     // R
+                        data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise)); // G
+                        data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise)); // B
+                    }
+                }
+
+                ctx.putImageData(imageData, 0, 0);
+            }
+
+            getQualityClass(age) {
+                if (age === 0) return 'quality-high';
+                if (age <= 1) return 'quality-medium';
+                if (age <= 3) return 'quality-low';
+                return 'quality-degraded';
+            }
+
+            getQualityText(age) {
+                if (age === 0) return 'RECENT';
+                if (age === 1) return '1 YEAR';
+                return `${age} YEARS`;
+            }
+
+            
+
+            drawModalImage(canvas, memory, degradationLevel) {
+                const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+    const currentImage = (isDarkMode && memory.darkUploadedImage) ? memory.darkUploadedImage : memory.uploadedImage;
+    const currentImageData = (isDarkMode && memory.darkOriginalImageData) ? memory.darkOriginalImageData : memory.originalImageData;
+    
+    if (!currentImage || !currentImageData) return;
+
+                const ctx = canvas.getContext('2d');
+                const pixelSizes = [1, 4, 8, 16, 32];
+                const pixelSize = pixelSizes[degradationLevel] || 1;
+
+                // 캔버스 크기를 이미지에 맞게 조정
+                const aspectRatio = memory.originalImageData.width / memory.originalImageData.height;
+                let newWidth, newHeight;
+
+                if (aspectRatio > 1) {
+                    newWidth = Math.min(700, memory.originalImageData.width);
+                    newHeight = newWidth / aspectRatio;
+                } else {
+                    newHeight = Math.min(700, memory.originalImageData.height);
+                    newWidth = newHeight * aspectRatio;
+                }
+
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+
+                // 임시 캔버스에 원본 이미지 그리기
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = newWidth;
+                tempCanvas.height = newHeight;
+
+                tempCtx.drawImage(memory.uploadedImage, 0, 0, newWidth, newHeight);
+                const imageData = tempCtx.getImageData(0, 0, newWidth, newHeight);
+
+                // 픽셀화 적용
+                const pixelatedData = this.pixelateImage(tempCanvas, imageData, pixelSize);
+                
+                // 메인 캔버스에 픽셀화된 이미지 그리기
+                ctx.putImageData(pixelatedData, 0, 0);
+
+                // 추가 노이즈 효과
+                if (degradationLevel > 0) {
+                    this.addNoise(ctx, newWidth, newHeight, degradationLevel * 0.05);
+                }
+            }
+
+            drawPixelatedImage(canvas, degradationLevel) {
+                if (!this.originalImageData) return;
+
+                const ctx = canvas.getContext('2d');
+                const pixelSizes = [1, 4, 8, 16, 32]; // 0년부터 4년까지의 픽셀 크기
+                const pixelSize = pixelSizes[degradationLevel] || 1;
+
+                // 캔버스 크기를 이미지에 맞게 조정
+                const aspectRatio = this.originalImageData.width / this.originalImageData.height;
+                let newWidth, newHeight;
+
+                if (aspectRatio > 1) {
+                    newWidth = Math.min(600, this.originalImageData.width);
+                    newHeight = newWidth / aspectRatio;
+                } else {
+                    newHeight = Math.min(600, this.originalImageData.height);
+                    newWidth = newHeight * aspectRatio;
+                }
+
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+
+                // 임시 캔버스에 원본 이미지 그리기
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = newWidth;
+                tempCanvas.height = newHeight;
+
+                tempCtx.drawImage(this.uploadedImage, 0, 0, newWidth, newHeight);
+                const imageData = tempCtx.getImageData(0, 0, newWidth, newHeight);
+
+                // 픽셀화 적용
+                const pixelatedData = this.pixelateImage(tempCanvas, imageData, pixelSize);
+                
+                // 메인 캔버스에 픽셀화된 이미지 그리기
+                ctx.putImageData(pixelatedData, 0, 0);
+
+                // 추가 노이즈 효과 (연도가 오래될수록 증가)
+                if (degradationLevel > 0) {
+                    this.addNoise(ctx, newWidth, newHeight, degradationLevel * 0.05);
+                }
+            }
+
+            setupEventListeners() {
+                // 타임라인 클릭
+                document.querySelectorAll('.timeline-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const age = item.dataset.age === 'all' ? 'all' : parseInt(item.dataset.age);
+                        this.filterByAge(age);
+                        
+                        document.querySelectorAll('.timeline-item').forEach(t => t.classList.remove('active'));
+                        item.classList.add('active');
+                    });
+                });
+
+                // 모달 클릭 외부 영역 닫기
+                document.getElementById('modal').addEventListener('click', (e) => {
+                    if (e.target.id === 'modal') {
+                        this.closeModal();
+                    }
+                });
+
+                // 다크모드 토글 이벤트
+                document.getElementById('darkModeSwitch').addEventListener('change', (e) => {
+                this.toggleDarkMode(e.target.checked);
+                });
+            }
+
+            filterByAge(age) {
+                this.currentFilter = age;
+                this.renderMemories();
+                this.updateStats();
+            }
+
+            getFilterTitle(age) {
+                const titles = {
+                    0: 'RECENT MEMORIES',
+                    1: 'ONE YEAR AGO',
+                    2: 'TWO YEARS AGO', 
+                    3: 'THREE YEARS AGO',
+                    4: 'FOUR YEARS AGO'
+                };
+                return titles[age] || 'ALL MEMORIES';
+            }
+
+            updateStats() {
+                const filteredMemories = this.currentFilter === 'all' ? 
+                    this.memories : 
+                    this.memories.filter(memory => memory.age === this.currentFilter);
+
+                const stats = {
+                    total: filteredMemories.length,
+                    clear: filteredMemories.filter(m => m.age <= 1).length,
+                    blurry: filteredMemories.filter(m => m.age > 1 && m.age <= 3).length,
+                    lost: filteredMemories.filter(m => m.age > 3).length
+                };
+
+                document.getElementById('totalMemories').textContent = stats.total;
+                document.getElementById('clearMemories').textContent = stats.clear;
+                document.getElementById('blurryMemories').textContent = stats.blurry;
+                document.getElementById('lostMemories').textContent = stats.lost;
+            }
+        }
+
+        
+
+        // 전역 함수들
+        function uploadImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    window.memoryApp.uploadedImage = img;
+                    
+                    // 원본 이미지 데이터 저장
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCanvas.width = img.width;
+                    tempCanvas.height = img.height;
+                    tempCtx.drawImage(img, 0, 0);
+                    window.memoryApp.originalImageData = tempCtx.getImageData(0, 0, img.width, img.height);
+                    
+                    // 모달 캔버스 업데이트
+                    const modalCanvas = document.getElementById('modalCanvas');
+                    window.memoryApp.drawPixelatedImage(modalCanvas, 0);
+                    
+                    // ORIGINAL 버튼 활성화
+                    document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
+                    document.querySelector('.control-btn:not(.upload-btn)').classList.add('active');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function showDegradation(age) {
+            if (!window.memoryApp.selectedMemory || !window.memoryApp.selectedMemory.uploadedImage) return;
+            
+            const modalCanvas = document.getElementById('modalCanvas');
+            window.memoryApp.drawModalImage(modalCanvas, window.memoryApp.selectedMemory, age);
+            
+            // 버튼 상태 업데이트
+            document.querySelectorAll('.control-btn:not(.upload-btn)').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        // 앱 초기화
+        window.addEventListener('DOMContentLoaded', () => {
+            window.memoryApp = new MemoryPixelation();
+        });
+
+        function goHome() {
+    window.location.href = "index.html";
+  }
+
+        
+    </script>
+</body>
+</html>
