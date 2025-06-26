@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>픽셀 모자이크 갤러리</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #1a1a1a;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+            cursor: none;
+        }
+
+        .custom-cursor {
+            position: fixed;
+            width: 8px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 1px;
+            pointer-events: none;
+            z-index: 10000;
+            transform: translate(-50%, -50%);
+            transition: all 0.1s ease;
+        }
+
+        .background-pixels {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .pixel-particle {
+            position: absolute;
+            animation: float 8s infinite linear;
+        }
+
+        .pixel-large {
+            width: 6px;
+            height: 6px;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+        }
+
+        .pixel-medium {
+            width: 4px;
+            height: 4px;
+            box-shadow: 0 0 6px rgba(255, 255, 255, 0.2);
+        }
+
+        .pixel-small {
+            width: 3px;
+            height: 3px;
+            box-shadow: 0 0 4px rgba(255, 255, 255, 0.1);
+        }
+
+        .pixel-glitch {
+            animation: glitch 6s infinite linear;
+        }
+
+        .pixel-diagonal {
+            animation: diagonal 10s infinite linear;
+        }
+
+        .mouse-trail {
+            position: fixed;
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 1px;
+            pointer-events: none;
+            z-index: 9999;
+            animation: trail-fade 1s ease-out forwards;
+        }
+
+        .click-burst {
+            position: fixed;
+            width: 6px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 1px;
+            pointer-events: none;
+            z-index: 9998;
+            animation: burst 0.8s ease-out forwards;
+        }
+
+        @keyframes trail-fade {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.3);
+            }
+        }
+
+        @keyframes burst {
+            0% {
+                opacity: 1;
+                transform: scale(0.5);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(3);
+            }
+        }
+
+        .dissolve-particle {
+            position: absolute;
+            background: #fff;
+            pointer-events: none;
+            z-index: 1001;
+        }
+
+        @keyframes dissolve {
+            0% {
+                opacity: 1;
+                transform: scale(1) translate(0, 0) rotate(0deg);
+            }
+            50% {
+                opacity: 0.8;
+                transform: scale(0.8) translate(var(--random-x), var(--random-y)) rotate(180deg);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.3) translate(calc(var(--random-x) * 2), calc(var(--random-y) * 2)) rotate(360deg);
+            }
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) translateX(0px) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-20px) translateX(50px) rotate(180deg);
+                opacity: 0;
+            }
+        }
+
+        @keyframes glitch {
+            0% {
+                transform: translateY(100vh) translateX(0px);
+                opacity: 0;
+            }
+            15% {
+                opacity: 1;
+                transform: translateY(70vh) translateX(5px);
+            }
+            20% {
+                transform: translateY(70vh) translateX(-5px);
+            }
+            25% {
+                transform: translateY(70vh) translateX(3px);
+            }
+            30% {
+                transform: translateY(70vh) translateX(0px);
+            }
+            100% {
+                transform: translateY(-20px) translateX(30px);
+                opacity: 0;
+            }
+        }
+
+        @keyframes diagonal {
+            0% {
+                transform: translate(-30px, 100vh) scale(0.8);
+                opacity: 0;
+            }
+            15% {
+                opacity: 1;
+                transform: translate(0px, 70vh) scale(1);
+            }
+            85% {
+                opacity: 1;
+                transform: translate(100px, 30vh) scale(1.1);
+            }
+            100% {
+                transform: translate(130px, -20px) scale(0.8);
+                opacity: 0;
+            }
+        }
+
+        /* 기존 애니메이션들 아래에 추가 */
+@keyframes float-image {
+    0% {
+        transform: translateY(100vh) translateX(0px) rotate(0deg);
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.7;
+    }
+    90% {
+        opacity: 0.7;
+    }
+    100% {
+        transform: translateY(-100px) translateX(var(--drift-x)) rotate(var(--rotation));
+        opacity: 0;
+    }
+}
+
+.floating-image {
+    position: absolute;
+    pointer-events: none;
+    z-index: -1;
+    animation: float-image 15s infinite linear;
+}
+
+        .matrix-line {
+            position: absolute;
+            width: 1px;
+            background: linear-gradient(180deg, transparent, rgba(200, 200, 200, 0.4), transparent);
+            animation: matrix 6s infinite linear;
+        }
+
+        @keyframes matrix {
+            0% {
+                transform: translateY(-100px);
+                opacity: 0;
+            }
+            15% {
+                opacity: 1;
+            }
+            85% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh);
+                opacity: 0;
+            }
+        }
+
+        .gallery-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 20px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .image-container {
+            position: relative;
+            aspect-ratio: 1;
+            overflow: hidden;
+            background: #333;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .image-container:hover {
+            transform: scale(1.05);
+        }
+
+        .image-container.dissolving {
+            pointer-events: none;
+        }
+
+        .image-container.dissolved {
+            opacity: 0.3;
+            pointer-events: auto;
+        }
+
+        .pixel-canvas {
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        .original-image {
+            display: none;
+        }
+
+        .back-button {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            cursor: pointer;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px) scale(1.1);
+        }
+
+        .back-arrow {
+            width: 0;
+            height: 0;
+            border-top: 8px solid transparent;
+            border-bottom: 8px solid transparent;
+            border-right: 12px solid #fff;
+            margin-left: -2px;
+        }
+
+        .title {
+            margin-bottom: 40px;
+            font-size: 2.5rem;
+            font-weight: 300;
+            letter-spacing: 3px;
+            text-align: center;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            .gallery-container {
+                grid-template-columns: repeat(2, 1fr);
+                grid-template-rows: repeat(6, 1fr);
+                gap: 15px;
+            }
+            
+            .title {
+                font-size: 2rem;
+                margin-bottom: 30px;
+            }
+        }
+
+        .subtitle {
+    text-align: center;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: -20px;
+    margin-bottom: 40px;
+    font-weight: 300;
+    letter-spacing: 1px;
+    font-family: 'Courier New', monospace;
+}
+
+@media (max-width: 768px) {
+    .subtitle {
+        font-size: 0.8rem;
+        margin-top: -15px;
+        margin-bottom: 30px;
+    }
+}
+    </style>
+</head>
+<body>
+    <div class="custom-cursor"></div>
+    <div class="background-pixels"></div>
+    
+    
+    <h1 class="title">Everything will eventually become pixels.</h1>
+    <p class="subtitle">double click to pixelate</p>
+    
+    <div class="gallery-container">
+        <div class="image-container">
+            <img class="original-image" src="St_dark.png" alt="Image 1">
+            <canvas class="pixel-canvas"></canvas>
+        </div>
+        <div class="image-container">
+            <img class="original-image" src="Rm_dark.png" alt="Image 2">
+            <canvas class="pixel-canvas"></canvas>
+        </div>
+        <div class="image-container">
+            <img class="original-image" src="Wf_dark.png" alt="Image 3">
+            <canvas class="pixel-canvas"></canvas>
+        </div>
+        <div class="image-container">
+            <img class="original-image" src="2022_1_dark.png" alt="Image 4">
+            <canvas class="pixel-canvas"></canvas>
+        </div>
+        <div class="image-container">
+            <img class="original-image" src="sc_5.png" alt="Image 5">
+            <canvas class="pixel-canvas"></canvas>
+        </div>
+        <div class="image-container">
+            <img class="original-image" src="Il_dark.png" alt="Image 6">
+            <canvas class="pixel-canvas"></canvas>
+        </div>
+        <div class="image-container">
+            <img class="original-image" src="cr_dark.png" alt="Image 7">
+            <canvas class="pixel-canvas"></canvas>
+        </div>
+        <div class="image-container">
+            <img class="original-image" src="Gd_dark.png" alt="Image 8">
+            <canvas class="pixel-canvas"></canvas>
+        </div>
+        <div class="image-container">
+            <img class="original-image" src="Face_dark.png" alt="Image 9">
+            <canvas class="pixel-canvas"></canvas>
+        </div>
+        <div class="image-container">
+            <img class="original-image" src="bus_5.png" alt="Image 10">
+            <canvas class="pixel-canvas"></canvas>
+        </div>
+        <div class="image-container">
+            <img class="original-image" src="2020_커디2_dark.jpg" alt="Image 11">
+            <canvas class="pixel-canvas"></canvas>
+        </div>
+        <div class="image-container">
+            <img class="original-image" src="lur_dark.png" alt="Image 12">
+            <canvas class="pixel-canvas"></canvas>
+        </div>
+    </div>
+
+    <!-- 수정 후 -->
+<a href="#" class="back-button">
+    <div class="back-arrow"></div>
+</a>
+      
+      
+      
+    
+
+    <script>
+        class PixelMosaic {
+            constructor() {
+                this.images = [];
+                this.canvases = [];
+                this.pixelSize = 16;
+                this.animationSpeed = 20;
+                this.mouseX = 0;
+                this.mouseY = 0;
+                this.init();
+                this.createBackgroundPixels();
+                this.setupMouseEffects();
+            }
+
+            setupMouseEffects() {
+                const cursor = document.querySelector('.custom-cursor');
+                let trailTimer;
+
+                // 마우스 커서 따라다니기
+                document.addEventListener('mousemove', (e) => {
+                    this.mouseX = e.clientX;
+                    this.mouseY = e.clientY;
+                    
+                    cursor.style.left = e.clientX + 'px';
+                    cursor.style.top = e.clientY + 'px';
+
+                    // 마우스 트레일 효과
+                    if (Math.random() < 0.3) {
+                        this.createMouseTrail(e.clientX, e.clientY);
+                    }
+                });
+
+                // 클릭 시 원형 확산 효과
+                document.addEventListener('click', (e) => {
+                    this.createClickBurst(e.clientX, e.clientY);
+                });
+
+                // 마우스가 화면을 벗어나면 커서 숨기기
+                document.addEventListener('mouseleave', () => {
+                    cursor.style.opacity = '0';
+                });
+
+                document.addEventListener('mouseenter', () => {
+                    cursor.style.opacity = '1';
+                });
+            }
+
+            createMouseTrail(x, y) {
+                const trail = document.createElement('div');
+                trail.className = 'mouse-trail';
+                trail.style.left = (x + (Math.random() - 0.5) * 20) + 'px';
+                trail.style.top = (y + (Math.random() - 0.5) * 20) + 'px';
+                
+                document.body.appendChild(trail);
+                
+                setTimeout(() => {
+                    if (document.body.contains(trail)) {
+                        document.body.removeChild(trail);
+                    }
+                }, 1000);
+            }
+
+            createClickBurst(x, y) {
+                const burstCount = 12;
+                const radius = 80;
+                
+                for (let i = 0; i < burstCount; i++) {
+                    const angle = (i / burstCount) * Math.PI * 2;
+                    const distance = Math.random() * radius + 20;
+                    
+                    const burst = document.createElement('div');
+                    burst.className = 'click-burst';
+                    burst.style.left = (x + Math.cos(angle) * distance) + 'px';
+                    burst.style.top = (y + Math.sin(angle) * distance) + 'px';
+                    burst.style.animationDelay = (Math.random() * 0.2) + 's';
+                    
+                    document.body.appendChild(burst);
+                    
+                    setTimeout(() => {
+                        if (document.body.contains(burst)) {
+                            document.body.removeChild(burst);
+                        }
+                    }, 800);
+                }
+            }
+
+            createBackgroundPixels() {
+                const container = document.querySelector('.background-pixels');
+                
+                
+                // 다양한 크기의 픽셀 파티클 (속도 느리게, 색상 통일)
+                setInterval(() => {
+                    const pixel = document.createElement('div');
+                    const types = ['pixel-large', 'pixel-medium', 'pixel-small'];
+                    const animations = ['', 'pixel-glitch', 'pixel-diagonal'];
+                    
+                    pixel.className = `pixel-particle ${types[Math.floor(Math.random() * types.length)]} ${animations[Math.floor(Math.random() * animations.length)]}`;
+                    pixel.style.left = Math.random() * 100 + '%';
+                    pixel.style.animationDelay = Math.random() * 3 + 's';
+                    
+                    // 흰색과 회색 톤으로 통일
+                    const colors = [
+                        'rgba(255, 255, 255, 0.6)',
+                        'rgba(200, 200, 200, 0.5)',
+                        'rgba(150, 150, 150, 0.4)',
+                        'rgba(255, 255, 255, 0.3)'
+                    ];
+                    pixel.style.background = colors[Math.floor(Math.random() * colors.length)];
+                    
+                    container.appendChild(pixel);
+                    
+                    setTimeout(() => {
+                        if (container.contains(pixel)) {
+                            container.removeChild(pixel);
+                        }
+                    }, 12000);
+                   
+    // 기존 코드들은 그대로 유지...
+    // (pixel particle, matrix line, glitch 효과 코드들)
+    
+    // ===== 여기서부터 새로 추가할 부분 =====
+    
+    // 배경에 떠다닐 PNG 이미지들 배열 (여기에 원하는 이미지 파일명 추가)
+    const backgroundImages = [
+        'px_1.png',
+        'px_2.png', 
+        'px_3.png',
+        'px_9.png',
+        
+        // 원하는 만큼 이미지 추가
+    ];
+    
+    // PNG 이미지 애니메이션
+    setInterval(() => {
+        if (backgroundImages.length === 0) return;
+        
+        const img = document.createElement('img');
+        const randomImage = backgroundImages[Math.floor(Math.random() * backgroundImages.length)];
+        
+        img.src = randomImage;
+        img.className = 'floating-image';
+        img.style.left = Math.random() * 100 + '%';
+        img.style.width = (Math.random() * 50 + 15) + 'px'; // 40-100px 랜덤 크기
+        img.style.height = 'auto';
+        img.style.animationDelay = Math.random() * 3 + 's';
+        img.style.animationDuration = (Math.random() * 12 + 17) + 's'; // 10-20초 랜덤
+        
+        // 흔들림과 회전 효과를 위한 CSS 변수 설정
+        const driftX = (Math.random() - 0.5) * 200; // -100px ~ +100px 좌우 흔들림
+        const rotation = (Math.random() - 0.5) * 720; // -360° ~ +360° 회전
+        img.style.setProperty('--drift-x', driftX + 'px');
+        img.style.setProperty('--rotation', rotation + 'deg');
+        
+        // 투명도 랜덤 설정
+        img.style.opacity = (Math.random() * 0.4 + 0.3); // 0.3-0.7 투명도
+        
+        container.appendChild(img);
+        
+        // 애니메이션 완료 후 제거
+        setTimeout(() => {
+            if (container.contains(img)) {
+                container.removeChild(img);
+            }
+        }, 15000); // 20초 후 제거
+        
+    }, 6000); // 3초마다 새 이미지 생성
+
+
+                }, 200);
+
+                // 매트릭스 스타일 라인 효과 (속도 느리게)
+                setInterval(() => {
+                    const line = document.createElement('div');
+                    line.className = 'matrix-line';
+                    line.style.left = Math.random() * 100 + '%';
+                    line.style.height = Math.random() * 150 + 80 + 'px';
+                    line.style.animationDelay = Math.random() * 2 + 's';
+                    
+                    container.appendChild(line);
+                    
+                    setTimeout(() => {
+                        if (container.contains(line)) {
+                            container.removeChild(line);
+                        }
+                    }, 6000);
+                }, 1200);
+
+                // 큰 글리치 효과 (빈도 줄이고 색상 통일)
+                setInterval(() => {
+                    const glitch = document.createElement('div');
+                    glitch.className = 'pixel-particle pixel-large pixel-glitch';
+                    glitch.style.left = Math.random() * 100 + '%';
+                    glitch.style.background = 'rgba(180, 180, 180, 0.6)';
+                    glitch.style.boxShadow = '0 0 15px rgba(180, 180, 180, 0.4)';
+                    glitch.style.width = '5px';
+                    glitch.style.height = '5px';
+                    
+                    container.appendChild(glitch);
+                    
+                    setTimeout(() => {
+                        if (container.contains(glitch)) {
+                            container.removeChild(glitch);
+                        }
+                    }, 6000);
+                }, 3000);
+
+                
+
+                
+            }
+
+            init() {
+                const imageElements = document.querySelectorAll('.original-image');
+                const canvasElements = document.querySelectorAll('.pixel-canvas');
+
+                imageElements.forEach((img, index) => {
+                    const canvas = canvasElements[index];
+                    const ctx = canvas.getContext('2d');
+                    const container = canvas.parentElement;
+                    
+                    // 호버 효과를 위한 이벤트 리스너
+                    container.addEventListener('mouseenter', () => {
+                        this.showColorVersion(canvas, img);
+                    });
+                    
+                    container.addEventListener('mouseleave', () => {
+                        this.showBWVersion(canvas, img);
+                    });
+                    
+                    // 더블클릭 이벤트 리스너 추가
+                    container.addEventListener('dblclick', (e) => {
+                        e.preventDefault();
+                        this.dissolveImage(container, canvas, img);
+                    });
+                    
+                    img.onload = () => {
+                        this.setupCanvas(canvas, img);
+                        this.startPixelAnimation(canvas, img, index * 300);
+                    };
+
+                    // 이미지가 이미 로드된 경우를 위한 처리
+                    if (img.complete) {
+                        this.setupCanvas(canvas, img);
+                        this.startPixelAnimation(canvas, img, index * 300);
+                    }
+                });
+            }
+
+            setupCanvas(canvas, img) {
+                const container = canvas.parentElement;
+                const rect = container.getBoundingClientRect();
+                
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+                
+                // 리사이즈 이벤트 리스너 추가
+                window.addEventListener('resize', () => {
+                    const newRect = container.getBoundingClientRect();
+                    canvas.width = newRect.width;
+                    canvas.height = newRect.height;
+                });
+            }
+
+            startPixelAnimation(canvas, img, delay) {
+                setTimeout(() => {
+                    this.animatePixels(canvas, img);
+                }, delay);
+            }
+
+            animatePixels(canvas, img) {
+                const ctx = canvas.getContext('2d');
+                const width = canvas.width;
+                const height = canvas.height;
+
+                // 임시 캔버스로 이미지 그리기 및 흑백 변환
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = width;
+                tempCanvas.height = height;
+
+                // 이미지를 캔버스 크기에 맞게 그리기
+                tempCtx.drawImage(img, 0, 0, width, height);
+
+                // 흑백 필터 적용
+                const imageData = tempCtx.getImageData(0, 0, width, height);
+                const data = imageData.data;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                    data[i] = gray;     // Red
+                    data[i + 1] = gray; // Green
+                    data[i + 2] = gray; // Blue
+                }
+
+                tempCtx.putImageData(imageData, 0, 0);
+
+                // 픽셀 좌표 배열 생성 및 섞기
+                const pixels = [];
+                for (let x = 0; x < width; x += this.pixelSize) {
+                    for (let y = 0; y < height; y += this.pixelSize) {
+                        pixels.push({ x, y });
+                    }
+                }
+
+                // Fisher-Yates 셔플 알고리즘
+                for (let i = pixels.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pixels[i], pixels[j]] = [pixels[j], pixels[i]];
+                }
+
+                // 픽셀 애니메이션
+                let pixelIndex = 0;
+                const animateNextPixel = () => {
+                    if (pixelIndex >= pixels.length) return;
+
+                    const pixel = pixels[pixelIndex];
+                    const imageData = tempCtx.getImageData(pixel.x, pixel.y, this.pixelSize, this.pixelSize);
+                    
+                    ctx.putImageData(imageData, pixel.x, pixel.y);
+                    
+                    pixelIndex++;
+                    setTimeout(animateNextPixel, this.animationSpeed);
+                };
+
+                animateNextPixel();
+            }
+
+            showColorVersion(canvas, img) {
+                const ctx = canvas.getContext('2d');
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0, width, height);
+            }
+
+            showBWVersion(canvas, img) {
+                this.animatePixels(canvas, img);
+            }
+
+            dissolveImage(container, canvas, img) {
+                // 이미 분해 중이거나 분해된 상태면 복원
+                if (container.classList.contains('dissolving') || container.classList.contains('dissolved')) {
+                    this.restoreImage(container, canvas, img);
+                    return;
+                }
+
+                container.classList.add('dissolving');
+                
+                const ctx = canvas.getContext('2d');
+                const rect = canvas.getBoundingClientRect();
+                const width = canvas.width;
+                const height = canvas.height;
+
+                // 현재 캔버스 상태 저장
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const data = imageData.data;
+
+                // 픽셀 파티클 생성
+                const particleSize = 4;
+                const particles = [];
+
+                for (let x = 0; x < width; x += particleSize) {
+                    for (let y = 0; y < height; y += particleSize) {
+                        const pixelIndex = (y * width + x) * 4;
+                        const r = data[pixelIndex];
+                        const g = data[pixelIndex + 1];
+                        const b = data[pixelIndex + 2];
+                        const a = data[pixelIndex + 3];
+
+                        // 투명하지 않은 픽셀만 파티클로 변환
+                        if (a > 50) {
+                            const particle = document.createElement('div');
+                            particle.className = 'dissolve-particle';
+                            particle.style.width = particleSize + 'px';
+                            particle.style.height = particleSize + 'px';
+                            particle.style.background = `rgba(${r}, ${g}, ${b}, ${a/255})`;
+                            particle.style.left = (rect.left + x) + 'px';
+                            particle.style.top = (rect.top + y) + 'px';
+                            
+                            // 랜덤한 이동 방향 설정
+                            const randomX = (Math.random() - 0.5) * 200;
+                            const randomY = (Math.random() - 0.5) * 200;
+                            particle.style.setProperty('--random-x', randomX + 'px');
+                            particle.style.setProperty('--random-y', randomY + 'px');
+                            
+                            particle.style.animation = `dissolve ${2 + Math.random() * 2}s ease-out forwards`;
+                            particle.style.animationDelay = Math.random() * 0.5 + 's';
+                            
+                            document.body.appendChild(particle);
+                            particles.push(particle);
+                        }
+                    }
+                }
+
+                // 캔버스 서서히 페이드 아웃
+                let opacity = 1;
+                const fadeInterval = setInterval(() => {
+                    opacity -= 0.05;
+                    canvas.style.opacity = opacity;
+                    
+                    if (opacity <= 0) {
+                        clearInterval(fadeInterval);
+                        ctx.clearRect(0, 0, width, height);
+                        container.classList.remove('dissolving');
+                        container.classList.add('dissolved');
+                    }
+                }, 50);
+
+                // 파티클 정리
+                setTimeout(() => {
+                    particles.forEach(particle => {
+                        if (document.body.contains(particle)) {
+                            document.body.removeChild(particle);
+                        }
+                    });
+                }, 4000);
+            }
+
+            restoreImage(container, canvas, img) {
+                container.classList.remove('dissolved');
+                canvas.style.opacity = 1;
+                
+                // 호버 상태에 따라 적절한 버전 표시
+                if (container.matches(':hover')) {
+                    this.showColorVersion(canvas, img);
+                } else {
+                    this.showBWVersion(canvas, img);
+                }
+            }
+        }
+
+        // 페이지 로드 후 실행
+        window.addEventListener('load', () => {
+            new PixelMosaic();
+        });
+
+        // 뒤로가기 버튼 기능 개선
+        // 뒤로가기 버튼 기능 개선
+// 뒤로가기 버튼 기능 개선
+function goHome() {
+    // 브라우저 히스토리에서 이전 페이지로 이동 시도
+    if (window.history.length > 1 && document.referrer) {
+        window.history.back();
+    } else {
+        // 이전 페이지가 없거나 직접 접근한 경우 index.html로 이동
+        window.location.href = 'index.html';
+    }
+}
+
+// 뒤로가기 버튼 이벤트 리스너
+document.addEventListener('DOMContentLoaded', function() {
+    const backButton = document.querySelector('.back-button');
+    if (backButton) {
+        backButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            goHome();
+        });
+    }
+});
+        
+    
+
+
+
+    </script>
+</body>
+</html>
